@@ -6,7 +6,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.use(cors());
-app.use(express.urlencoded({ extended: true })); // Para procesar formularios
+app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
 const TRESGUERRAS_API_URL = "https://intranet.tresguerras.com.mx/WS/api/Customer/JSON/?action=ApiCotizacion";
@@ -27,8 +27,8 @@ async function obtenerDatosProducto(modelo) {
   }
 }
 
-// Ruta para mostrar el formulario en el popup
 app.get("/cotizar", (req, res) => {
+  console.log("Solicitud GET recibida en /cotizar con modelo:", req.query.modelo);
   const modelo = req.query.modelo || "";
   if (!modelo) {
     return res.send("<h3>Error: No se proporcionó un modelo de producto.</h3>");
@@ -59,8 +59,8 @@ app.get("/cotizar", (req, res) => {
   `);
 });
 
-// Ruta para procesar el formulario y mostrar el resultado
 app.post("/cotizar", async (req, res) => {
+  console.log("Solicitud POST recibida en /cotizar con datos:", req.body);
   const { modelo, cp_destino } = req.body;
 
   if (!modelo || !cp_destino) {
