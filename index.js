@@ -1,11 +1,19 @@
-  const express = require("express");
+const express = require("express");
 const cors = require("cors");
 const fetch = require("node-fetch");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+// Configuración de CORS específica para tu dominio
+const corsOptions = {
+  origin: "https://torrey.store", // Permitir solo tu dominio
+  methods: ["GET", "POST", "OPTIONS"], // Métodos permitidos
+  allowedHeaders: ["Content-Type"], // Encabezados permitidos
+  optionsSuccessStatus: 200 // Respuesta exitosa para OPTIONS
+};
+
+app.use(cors(corsOptions));
 app.use(express.json());
 
 const TRESGUERRAS_API_URL = "https://intranet.tresguerras.com.mx/WS/api/Customer/JSON/?action=ApiCotizacion";
@@ -25,6 +33,11 @@ async function obtenerDatosProducto(modelo) {
     return null;
   }
 }
+
+// Manejar solicitudes OPTIONS explícitamente (preflight)
+app.options("/cotizacion", (req, res) => {
+  res.status(200).end(); // Responde con 200 OK para el preflight
+});
 
 app.post("/cotizacion", async (req, res) => {
   const { modelo, cp_destino } = req.body;
