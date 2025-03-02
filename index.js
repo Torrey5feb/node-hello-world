@@ -5,7 +5,7 @@ const fetch = require("node-fetch");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors()); // CORS ya no es crítico, pero lo dejamos por si acaso
+app.use(cors());
 app.use(express.urlencoded({ extended: true })); // Para procesar formularios
 app.use(express.json());
 
