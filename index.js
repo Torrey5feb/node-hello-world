@@ -5,14 +5,8 @@ const fetch = require("node-fetch");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const corsOptions = {
-  origin: "https://torrey.store",
-  methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type"],
-  optionsSuccessStatus: 200
-};
-
-app.use(cors(corsOptions));
+app.use(cors()); // CORS ya no es crítico, pero lo dejamos por si acaso
+app.use(express.urlencoded({ extended: true })); // Para procesar formularios
 app.use(express.json());
 
 const TRESGUERRAS_API_URL = "https://intranet.tresguerras.com.mx/WS/api/Customer/JSON/?action=ApiCotizacion";
@@ -20,7 +14,6 @@ const ACCESS_USR = "API00162";
 const ACCESS_PASS = "VVZaQ1NrMUVRWGhPYWtwRVZEQTFWVlZyUmxSU1kwOVNVVlZHUkZaR1RrSlRNRlph";
 
 async function obtenerDatosProducto(modelo) {
-  console.log(`Obteniendo datos para el modelo: ${modelo}`);
   try {
     const response = await fetch("https://raw.githubusercontent.com/Torrey5feb/URLS/refs/heads/main/modelos.json", {
       timeout: 5000
@@ -34,24 +27,49 @@ async function obtenerDatosProducto(modelo) {
   }
 }
 
-app.options("/cotizacion", (req, res) => {
-  console.log("Recibida solicitud OPTIONS para /cotizacion");
-  res.status(200).end();
+// Ruta para mostrar el formulario en el popup
+app.get("/cotizar", (req, res) => {
+  const modelo = req.query.modelo || "";
+  if (!modelo) {
+    return res.send("<h3>Error: No se proporcionó un modelo de producto.</h3>");
+  }
+
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Cotizar Envío</title>
+      <style>
+        body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+        input, button { margin: 5px; padding: 5px; }
+        #resultado { margin-top: 10px; }
+      </style>
+    </head>
+    <body>
+      <h3>Cotizar Envío para ${modelo}</h3>
+      <form method="POST" action="/cotizar">
+        <input type="hidden" name="modelo" value="${modelo}">
+        <label for="cp_destino">Código Postal:</label><br>
+        <input type="text" id="cp_destino" name="cp_destino" maxlength="5" pattern="\\d{5}" required><br>
+        <button type="submit">Calcular</button>
+      </form>
+      <div id="resultado"></div>
+    </body>
+    </html>
+  `);
 });
 
-app.post("/cotizacion", async (req, res) => {
-  console.log("Solicitud POST recibida en /cotizacion:", req.body);
+// Ruta para procesar el formulario y mostrar el resultado
+app.post("/cotizar", async (req, res) => {
   const { modelo, cp_destino } = req.body;
 
   if (!modelo || !cp_destino) {
-    console.log("Faltan datos en la solicitud");
-    return res.status(400).json({ error: "Faltan datos: modelo del producto o código postal" });
+    return res.send("<h3>Error: Faltan datos (modelo o CP).</h3>");
   }
 
   const productoData = await obtenerDatosProducto(modelo);
   if (!productoData) {
-    console.log("Modelo no encontrado:", modelo);
-    return res.status(404).json({ error: "Modelo no encontrado en la base de datos" });
+    return res.send("<h3>Error: Modelo no encontrado en la base de datos.</h3>");
   }
 
   const requestData = {
@@ -74,7 +92,6 @@ app.post("/cotizacion", async (req, res) => {
     colonia_des: "DESCONOCIDA"
   };
 
-  console.log("Enviando solicitud a Tresguerras:", requestData);
   try {
     const response = await fetch(TRESGUERRAS_API_URL, {
       method: "POST",
@@ -85,27 +102,31 @@ app.post("/cotizacion", async (req, res) => {
 
     if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
     const data = await response.json();
-    console.log("Respuesta de Tresguerras:", data);
 
-    if (data.return) {
-      if (data.return.error) {
-        console.log("Error en la respuesta de Tresguerras:", data.return);
-        return res.status(400).json({
-          error: data.return.error,
-          descripcion_error: data.return.descripcion_error
-        });
-      }
-      res.json({
-        total: data.return.total || "0",
-        dias_transito: data.return.dias_transito || "N/A"
-      });
+    if (data.return && !data.return.error) {
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Resultado del Envío</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 20px; text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h3>Resultado para ${modelo}</h3>
+          <p>Costo de envío: $${data.return.total} MXN</p>
+          <p>Días de tránsito: ${data.return.dias_transito}</p>
+          <button onclick="window.close()">Cerrar</button>
+        </body>
+        </html>
+      `);
     } else {
-      console.log("Respuesta inesperada de Tresguerras:", data);
-      res.status(500).json({ error: "Respuesta inesperada de Tresguerras" });
+      res.send(`<h3>Error: ${data.return?.error || "Respuesta inesperada"}</h3><p>${data.return?.descripcion_error || ""}</p>`);
     }
   } catch (error) {
     console.error("Error al conectar con Tresguerras:", error);
-    res.status(500).json({ error: "Error al conectar con Tresguerras", details: error.message });
+    res.send(`<h3>Error al calcular el envío</h3><p>${error.message}</p>`);
   }
 });
 
